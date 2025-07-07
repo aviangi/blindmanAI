@@ -2,11 +2,10 @@
 
 import { generateSceneDescription } from "@/ai/flows/describe-scene";
 import { enhanceSceneDescription } from "@/ai/flows/enhance-scene-description";
-import { detectObjects, type DetectedObject } from "@/lib/object-detection";
+import { detectObjects } from "@/lib/object-detection";
 import { speak } from "@/lib/tts";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { ObjectOverlay } from "@/components/object-overlay";
 import { Spinner } from "@/components/ui/spinner";
 import { Camera, Pause, Play, Sparkles, Wand2 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -14,31 +13,17 @@ import { useState, useRef, useEffect, useCallback } from "react";
 export default function CameraView() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const objectDetectionIntervalRef = useRef<NodeJS.Timeout>();
 
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [sceneDescription, setSceneDescription] = useState("");
   const [canEnhance, setCanEnhance] = useState(false);
-  const [detectedObjects, setDetectedObjects] = useState<DetectedObject[]>([]);
   const [error, setError] = useState<string | null>(
     "Requesting camera permissions..."
   );
 
   const { toast } = useToast();
-
-  const startObjectDetection = useCallback(() => {
-    if (objectDetectionIntervalRef.current) {
-      clearInterval(objectDetectionIntervalRef.current);
-    }
-    objectDetectionIntervalRef.current = setInterval(async () => {
-      if (videoRef.current && !videoRef.current.paused) {
-        const objects = await detectObjects();
-        setDetectedObjects(objects);
-      }
-    }, 3000);
-  }, []);
 
   useEffect(() => {
     async function setupCamera() {
@@ -52,7 +37,6 @@ export default function CameraView() {
             videoRef.current.onloadedmetadata = () => {
               setIsCameraReady(true);
               setError(null);
-              startObjectDetection();
             };
           }
         } catch (err) {
@@ -74,15 +58,12 @@ export default function CameraView() {
     setupCamera();
 
     return () => {
-      if (objectDetectionIntervalRef.current) {
-        clearInterval(objectDetectionIntervalRef.current);
-      }
       if (videoRef.current && videoRef.current.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [toast, startObjectDetection]);
+  }, [toast]);
 
   const captureFrame = useCallback((): string | null => {
     const video = videoRef.current;
@@ -112,7 +93,6 @@ export default function CameraView() {
       }
       
       const objectsForDescription = await detectObjects();
-      setDetectedObjects(objectsForDescription);
 
       try {
         let description = "";
@@ -148,13 +128,9 @@ export default function CameraView() {
       if (videoRef.current.paused) {
         videoRef.current.play();
         setIsPaused(false);
-        startObjectDetection();
       } else {
         videoRef.current.pause();
         setIsPaused(true);
-        if (objectDetectionIntervalRef.current) {
-          clearInterval(objectDetectionIntervalRef.current);
-        }
       }
     }
   };
@@ -168,23 +144,6 @@ export default function CameraView() {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        detectedObjects.forEach(obj => {
-          context.strokeStyle = "#FFEB3B";
-          context.lineWidth = 4;
-          context.beginPath();
-          context.rect(obj.box[0] * canvas.width, obj.box[1] * canvas.height, obj.box[2] * canvas.width, obj.box[3] * canvas.height);
-          context.stroke();
-          
-          context.fillStyle = "#FFEB3B";
-          context.font = "18px 'PT Sans', sans-serif";
-          context.textBaseline = "top";
-          const text = `${obj.label} (${(obj.confidence * 100).toFixed(0)}%)`;
-          const textMetrics = context.measureText(text);
-          context.fillRect(obj.box[0] * canvas.width, obj.box[1] * canvas.height, textMetrics.width + 8, 28);
-          context.fillStyle = "#000";
-          context.fillText(text, obj.box[0] * canvas.width + 4, obj.box[1] * canvas.height + 4);
-        });
 
         const link = document.createElement("a");
         link.download = "sightspeak-snapshot.png";
@@ -212,8 +171,6 @@ export default function CameraView() {
           <p className="text-lg">{error}</p>
         </div>
       )}
-
-      {isCameraReady && <ObjectOverlay objects={detectedObjects} />}
 
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">
