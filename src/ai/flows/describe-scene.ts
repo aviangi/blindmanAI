@@ -17,7 +17,6 @@ const GenerateSceneDescriptionInputSchema = z.object({
     .describe(
       "A photo of the scene, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
-  detectedObjects: z.array(z.string()).describe('List of detected objects in the scene.'),
 });
 export type GenerateSceneDescriptionInput = z.infer<typeof GenerateSceneDescriptionInputSchema>;
 
@@ -36,7 +35,6 @@ const prompt = ai.definePrompt({
   output: {schema: GenerateSceneDescriptionOutputSchema},
   prompt: `You are an AI assistant that helps visually impaired users understand their surroundings. Analyze the image provided and generate a concise and natural language description of the scene.
 
-  Detected Objects: {{detectedObjects}}
   Photo: {{media url=photoDataUri}}
   `,
 });

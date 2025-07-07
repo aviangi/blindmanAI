@@ -1,24 +1,22 @@
 "use client";
 
 import { generateSceneDescription } from "@/ai/flows/describe-scene";
-import { enhanceSceneDescription } from "@/ai/flows/enhance-scene-description";
-import { detectObjects } from "@/lib/object-detection";
 import { speak } from "@/lib/tts";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { Camera, Pause, Play, Sparkles, Wand2 } from "lucide-react";
+import { Camera, Pause, Play } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 
 export default function CameraView() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const analysisRunningRef = useRef(false);
 
   const [isCameraReady, setIsCameraReady] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isPaused, setIsPaused] = useState(false); // User-controlled pause for the whole system
+  const [isProcessing, setIsProcessing] = useState(false); // True during AI call + TTS
   const [sceneDescription, setSceneDescription] = useState("");
-  const [canEnhance, setCanEnhance] = useState(false);
   const [error, setError] = useState<string | null>(
     "Requesting camera permissions..."
   );
@@ -82,81 +80,77 @@ export default function CameraView() {
     }
     return null;
   }, []);
+  
+  // This effect manages the analysis interval.
+  useEffect(() => {
+    if (!isCameraReady || isPaused) {
+      return;
+    }
 
-  const handleDescribeScene = useCallback(
-    async (enhance = false) => {
-      // Pause video if it's playing to start the analysis flow
-      if (videoRef.current && !videoRef.current.paused) {
-        videoRef.current.pause();
-        setIsPaused(true);
+    const runAnalysis = async () => {
+      if (analysisRunningRef.current) {
+        return; // An analysis is already in progress
       }
-
-      setIsLoading(true);
-      setCanEnhance(false);
+      analysisRunningRef.current = true;
+      setIsProcessing(true);
+      
       const photoDataUri = captureFrame();
 
       if (!photoDataUri) {
         toast({ title: "Error", description: "Could not capture frame.", variant: "destructive" });
-        setIsLoading(false);
+        analysisRunningRef.current = false;
+        setIsProcessing(false);
         return;
       }
       
-      const objectsForDescription = await detectObjects();
-
       try {
-        let description = "";
-        if (enhance) {
-          const result = await enhanceSceneDescription({
-            photoDataUri,
-            detectedObjects: objectsForDescription.map(o => o.label),
-            previousDescription: sceneDescription,
-          });
-          description = result.enhancedDescription;
-        } else {
-          const result = await generateSceneDescription({
-            photoDataUri,
-            detectedObjects: objectsForDescription.map(o => o.label),
-          });
-          description = result.sceneDescription;
-        }
+        const result = await generateSceneDescription({ photoDataUri });
+        const description = result.sceneDescription;
         setSceneDescription(description);
-        speak(description);
-        setCanEnhance(true);
+        await speak(description);
       } catch (e) {
         console.error("AI Error:", e);
         toast({ title: "AI Error", description: "Failed to generate description.", variant: "destructive" });
       } finally {
-        setIsLoading(false);
+        analysisRunningRef.current = false;
+        setIsProcessing(false);
       }
-    },
-    [captureFrame, sceneDescription, toast]
-  );
+    };
+
+    // Run once immediately when not paused
+    runAnalysis(); 
+    
+    const intervalId = setInterval(runAnalysis, 8000);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [isCameraReady, isPaused, captureFrame, toast]);
 
   const togglePause = () => {
-    if (videoRef.current) {
-      if (videoRef.current.paused) {
-        // If resuming, clear the description and resume video.
-        videoRef.current.play();
-        setIsPaused(false);
+    setIsPaused(current => {
+      const isNowPaused = !current;
+      if (isNowPaused) {
         setSceneDescription("");
-        setCanEnhance(false);
         if (window.speechSynthesis.speaking) {
           window.speechSynthesis.cancel();
         }
-      } else {
-        // Just pause the video.
-        videoRef.current.pause();
-        setIsPaused(true);
+        setIsProcessing(false);
+        analysisRunningRef.current = false;
       }
-    }
+      return isNowPaused;
+    });
   };
-
+  
   const handleSnapshot = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
      if (video && canvas) {
       const context = canvas.getContext("2d");
       if (context) {
+        const wasVideoPlaying = !video.paused;
+        if (wasVideoPlaying) video.pause();
+
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -166,6 +160,8 @@ export default function CameraView() {
         link.href = canvas.toDataURL("image/png");
         link.click();
         toast({ title: "Snapshot saved!" });
+        
+        if (wasVideoPlaying) video.play();
       }
     }
   };
@@ -188,7 +184,7 @@ export default function CameraView() {
         </div>
       )}
 
-      {isLoading && (
+      {(isProcessing && !sceneDescription) && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50">
           <Spinner className="h-16 w-16 text-accent" />
         </div>
@@ -203,35 +199,13 @@ export default function CameraView() {
       <div className="absolute bottom-5 left-1/2 -translate-x-1/2 w-full max-w-sm px-4">
         <div className="flex justify-center items-center space-x-2 p-2 rounded-full bg-primary/80 backdrop-blur-md shadow-2xl">
           <Button
-            onClick={() => handleDescribeScene(false)}
-            size="icon"
-            className="w-16 h-16 rounded-full bg-accent hover:bg-accent/90 text-accent-foreground"
-            aria-label="Describe Scene"
-            disabled={isLoading || !isCameraReady}
-          >
-            <Sparkles className="h-8 w-8" />
-          </Button>
-
-          {canEnhance && (
-             <Button
-                onClick={() => handleDescribeScene(true)}
-                size="icon"
-                className="w-12 h-12 rounded-full bg-secondary/80 hover:bg-secondary text-secondary-foreground"
-                aria-label="Enhance Description"
-                disabled={isLoading}
-              >
-                <Wand2 className="h-6 w-6" />
-              </Button>
-          )}
-
-          <Button
             onClick={togglePause}
             size="icon"
-            className="w-12 h-12 rounded-full bg-secondary/80 hover:bg-secondary text-secondary-foreground"
-            aria-label={isPaused ? "Resume" : "Pause"}
+            className="w-16 h-16 rounded-full bg-accent hover:bg-accent/90 text-accent-foreground"
+            aria-label={isPaused ? "Start Analysis" : "Stop Analysis"}
             disabled={!isCameraReady}
           >
-            {isPaused ? <Play className="h-6 w-6" /> : <Pause className="h-6 w-6" />}
+            {isPaused ? <Play className="h-8 w-8" /> : <Pause className="h-8 w-8" />}
           </Button>
 
           <Button
@@ -239,7 +213,7 @@ export default function CameraView() {
             size="icon"
             className="w-12 h-12 rounded-full bg-secondary/80 hover:bg-secondary text-secondary-foreground"
             aria-label="Take Snapshot"
-            disabled={!isCameraReady}
+            disabled={!isCameraReady || isProcessing}
           >
             <Camera className="h-6 w-6" />
           </Button>
