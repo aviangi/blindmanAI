@@ -62,6 +62,9 @@ export default function CameraView() {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach((track) => track.stop());
       }
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
     };
   }, [toast]);
 
@@ -82,6 +85,12 @@ export default function CameraView() {
 
   const handleDescribeScene = useCallback(
     async (enhance = false) => {
+      // Pause video if it's playing to start the analysis flow
+      if (videoRef.current && !videoRef.current.paused) {
+        videoRef.current.pause();
+        setIsPaused(true);
+      }
+
       setIsLoading(true);
       setCanEnhance(false);
       const photoDataUri = captureFrame();
@@ -126,9 +135,16 @@ export default function CameraView() {
   const togglePause = () => {
     if (videoRef.current) {
       if (videoRef.current.paused) {
+        // If resuming, clear the description and resume video.
         videoRef.current.play();
         setIsPaused(false);
+        setSceneDescription("");
+        setCanEnhance(false);
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.cancel();
+        }
       } else {
+        // Just pause the video.
         videoRef.current.pause();
         setIsPaused(true);
       }
