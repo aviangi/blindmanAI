@@ -12,42 +12,6 @@ This project is built with Next.js, TypeScript, and Tailwind CSS, and utilizes G
 -   **Text-to-Speech (TTS)**: Automatically reads the generated scene description aloud using the browser's native speech synthesis capabilities.
 -   **Interactive Controls**: Simple, accessible controls to pause/resume the camera feed, generate descriptions, enhance them, and save a snapshot of the current view.
 
-## Getting Started
-
-Follow these instructions to get a local copy up and running for development and testing.
-
-### Prerequisites
-
--   [Node.js](https://nodejs.org/) (version 20 or later)
--   [npm](https://www.npmjs.com/) (usually comes with Node.js)
--   A Google AI API Key. You can obtain one from [Google AI Studio](https://aistudio.google.com/app/apikey).
-
-### Installation & Setup
-
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository-url>
-    cd <repository-directory>
-    ```
-
-2.  **Install dependencies:**
-    ```bash
-    npm install
-    ```
-
-3.  **Set up environment variables:**
-    Create a file named `.env` in the root of your project and add your Google AI API key:
-    ```
-    GOOGLE_API_KEY=your_google_api_key_here
-    ```
-    This key is necessary for the scene description features to work.
-
-4.  **Run the development server:**
-    ```bash
-    npm run dev
-    ```
-    This command starts the Next.js application, which will be accessible at [http://localhost:9002](http://localhost:9002).
-
 ## Usage
 
 1.  **Grant Camera Permission**: When you first open the application, your browser will prompt you for camera access. Please allow it to enable the live video feed.
