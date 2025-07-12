@@ -32,3 +32,5 @@ As a web application, SightSpeak requires the following browser permissions:
 -   **Internet**: Required to communicate with the Google AI backend for scene description.
 
 No special microphone or storage permissions are needed for the core functionality, as TTS is handled by the browser and snapshots are downloaded directly.
+
+LINK TO WEBSITE - https://blindman-ai.vercel.app/
