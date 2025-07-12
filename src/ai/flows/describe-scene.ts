@@ -33,9 +33,13 @@ const prompt = ai.definePrompt({
   name: 'generateSceneDescriptionPrompt',
   input: {schema: GenerateSceneDescriptionInputSchema},
   output: {schema: GenerateSceneDescriptionOutputSchema},
-  prompt: `You are an AI assistant that helps visually impaired users understand their surroundings. Analyze the image provided and generate a short, precise description of the scene containing only important details. Focus on the main subjects, their immediate context, and provide an approximate distance of objects from the camera (e.g., "A person is standing about 5 feet away").
+  prompt: `You are an AI assistant that helps visually impaired users understand their surroundings. Analyze the image provided and generate a short, precise description of the scene.
 
-  Photo: {{media url=photoDataUri}}
+Your main goal is to provide an accurate estimation of the distance of objects from the camera. Use visual cues like the relative size of known objects (e.g., a person, a car, a water bottle) and perspective to make your judgment. For example, an object that appears smaller is likely further away.
+
+The description should contain only important details. Focus on the main subjects, their immediate context, and their estimated distance (e.g., "A person is standing about 5 feet away"). Be as accurate as possible with the distance.
+
+Photo: {{media url=photoDataUri}}
   `,
 });
 
