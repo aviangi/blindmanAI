@@ -120,7 +120,7 @@ export default function CameraView() {
     // Run once immediately when not paused
     runAnalysis(); 
     
-    const intervalId = setInterval(runAnalysis, 3000);
+    const intervalId = setInterval(runAnalysis, 1000);
 
     return () => {
       clearInterval(intervalId);
